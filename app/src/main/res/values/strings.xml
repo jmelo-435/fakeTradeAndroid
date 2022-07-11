@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Fake Trade</string>
+    <string name="server_client_id">802585832012-jgt4h595tr7464i4d5gf5p2q3ghks60j.apps.googleusercontent.com</string>
+    TODO:Atualizar com o nome do pacote do aplicativo
+    <string name="token_file">"com.example.faketrade.TOKEN_FILE"</string>
+
+</resources>
