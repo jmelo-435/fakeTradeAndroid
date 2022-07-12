@@ -21,7 +21,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewModel = ViewModelProvider(this).get(MainViewModel::class.java)
-        viewModel.checkIfTokenIsValid()
+        viewModel.refCheckIfTokenIsValid()
         fun initializeUI() {
             setContentView(R.layout.main_activity)
             supportFragmentManager.commit {

@@ -9,23 +9,17 @@ import java.io.IOException
 import org.json.JSONObject
 
 
-class AuthRepo{
+class RefAuthRepo{
     private val client = OkHttpClient()
     private val root = "http://192.168.15.7:5001"
     private val apiKey = "_zUYQ83k!x34%nh("
 
-    enum class AuthEndpoints(val value: String) {
-        Api("/api"), ApiUsers("/api/users"),ApiUserPassword("/api/user/password"),
-        ApiUserPasswordReset("/api/user/password_reset"),ApiUserRefreshToken("/api/user/refresh_token"),
-        ApiUserLogout("/api/user/logout"),ApiUsersGoogleToken("/api/users/google_token")
-    }
-
     fun buildRequest(
-        endpoint: AuthEndpoints = AuthEndpoints.Api,
+        endpoint: ValidEndpoints.AuthEndpoints = ValidEndpoints.AuthEndpoints.Api,
         headersMap: Map<String,String?> = mapOf(),
         data: JSONObject? = null,
-         method: Methods = Methods.GET,
-        listener: CustomListener
+        method: Methods ,
+        listener: AuthAPIListener
     ) {
         val mediaType = "application/json; charset=utf-8".toMediaType()
         val body = data?.toString()?.toRequestBody(mediaType)
@@ -43,7 +37,7 @@ class AuthRepo{
             .build()
         client.newCall(request).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
-                listener.onApiJSONResponse(JSONObject("""{"localError":504, "message":"$e"}"""))
+                listener.onAuthApiJSONResponse(JSONObject("""{"localError":504, "message":"$e"}"""))
             }
 
             override fun onResponse(call: Call, response: Response) {
@@ -51,12 +45,12 @@ class AuthRepo{
                     if (!response.isSuccessful) {
                         if (response.code == 401) {
                             println("code 401")
-                            listener.onTokenExpiredResponse(request)
+                            listener.onRefreshTokenExpiredResponse(request)
                         } else {
                             throw IOException("Unexpected code $response")
                         }
                     } else {
-                        listener.onApiJSONResponse(JSONObject(response.body?.string()?:"{}"))
+                        listener.onAuthApiJSONResponse(JSONObject(response.body?.string()?:"{}"))
                     }
                 }
             }

@@ -18,7 +18,7 @@ class MainDashboardActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         viewModel = ViewModelProvider(this).get(MainDashboardViewModel::class.java)
         setContentView(R.layout.main_dashboard)
-        viewModel.checkIfTokenIsValid()
+        viewModel.refCheckIfTokenIsValid()
         viewModel.isValidToken.observe(this){ result ->
             when (result){
                 is NetworkResult.Success -> {

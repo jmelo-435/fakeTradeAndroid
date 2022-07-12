@@ -2,20 +2,15 @@ package com.example.faketrade.ui.main
 
 
 import android.app.Application
-import android.content.Context
 import android.content.Intent
 import androidx.lifecycle.*
+import com.example.faketrade.domain.APIsCalls
 import com.example.faketrade.repo.*
-import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import okhttp3.Request
 import org.json.JSONObject
-import kotlin.coroutines.coroutineContext
+import java.lang.Error
 
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -23,11 +18,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
 
     val app = application
-    private val authRepo = AuthRepo()
-    private val tokenRepo = TokensRepo(app)
+    private val apiCalls = APIsCalls(app)
     private val googleLoginRepo = GoogleLoginRepo(app, listener = object :GoogleSigninListener{
         override fun onGooglePositiveResponse(token: String) {
-            loginGoogleUser(token)
+            refLoginGoogleUser(token)
         }
 
         override fun onGoogleErrorResponse(e: ApiException) {
@@ -54,139 +48,112 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         googleLoginRepo.handleSingnInResult(data)
 
     }
-
-
-
-    fun checkIfTokenIsValid() {
+    fun refCheckIfTokenIsValid(){
         _isValidToken.value = NetworkResult.Loading()
-        var currentToken: Map<String, String?> = mapOf(
-            TokenType.BEARER.value to tokenRepo.retreaveToken(TokenType.BEARER)
-        )
-        try {
+        try{
             viewModelScope.launch {
-                authRepo.buildRequest(
-                    endpoint = AuthRepo.AuthEndpoints.ApiUserRefreshToken,
-                    headersMap = currentToken,
-                    listener = object : CustomListener {
-                        override fun onApiJSONResponse(response: JSONObject) {
+                val params = APIsCalls.AuthApiRequestParameters()
+                params.endpoint =ValidEndpoints.AuthEndpoints.ApiUserRefreshToken
+                params.method = Methods.GET
 
-                            if (response.has("accessData") && response.has("bearerData")) {
-
-
-                                val access = response.get("accessData").toString()
-                                val bearer = response.get("bearerData").toString()
-                                tokenRepo.saveToken(access, TokenType.ACCESS)
-                                tokenRepo.saveToken(bearer, TokenType.BEARER)
-                                _isValidToken.postValue(NetworkResult.Success(true))
-                            }
-                        }
-
-                        override fun onTokenExpiredResponse(request: Request) {
-
-                            _isValidToken.postValue(NetworkResult.Success(false))
-
-                        }
-
-
+                APIsCalls(app).authApiCall(listener = object: RefCustomListener{
+                    override fun onApiJSONResponse(response: JSONObject) {
+                        _isValidToken.postValue(NetworkResult.Success(true))
                     }
-                )
 
+                    override fun onTokenExpiredResponse(request: Request?) {
+                        _isValidToken.postValue(NetworkResult.Success(false))
+                    }
 
+                }, params)
             }
-        } catch (e: Exception) {
-
+        }
+        catch(e: Error){
             _isValidToken.value = NetworkResult.Error(data = false, message = e.message)
-
-        }
-
-
-    }
-
-    private fun getLoginResponse(parameters: ApiRequestParameters) {
-        _isValidToken.value = NetworkResult.Loading()
-
-        parameters.scope.launch {
-            try {
-                authRepo.buildRequest(
-                    method = parameters.method,
-                    listener = object : CustomListener {
-                        override fun onApiJSONResponse(response: JSONObject) {
-                            if (response.has("code")) {
-                                _responseCode.postValue(NetworkResult.Success(response.get("code") as Int))
-                            }
-
-                            if (response.has("accessData") && response.has("bearerData")) {
-
-
-                                val access = response.get("accessData").toString()
-                                val bearer = response.get("bearerData").toString()
-
-                                tokenRepo.saveToken(access, TokenType.ACCESS)
-                                tokenRepo.saveToken(bearer, TokenType.BEARER)
-                                _isValidToken.postValue(NetworkResult.Success(true))
-                            }
-                            if (response.has("localError")) {
-                                _responseCode.postValue(
-                                    NetworkResult.Error(
-                                        data = 504,
-                                        message = response.get("message").toString()
-                                    )
-                                )
-                            }
-
-                        }
-
-                        override fun onTokenExpiredResponse(request: Request) {
-                            _isValidToken.postValue(NetworkResult.Success(false))
-                        }
-                    },
-                    endpoint = parameters.endpoint,
-                    headersMap = parameters.headersMap,
-                    data = parameters.data
-                )
-            } catch (e: Exception) {
-                _isValidToken.postValue(NetworkResult.Error(data = false))
-
-            }
-        }
-    }
-
-    fun createUser(user: JSONObject) {
-
-        viewModelScope.launch {
-            val parameters = ApiRequestParameters(scope = this)
-            parameters.scope = viewModelScope
-            parameters.data = user
-            parameters.endpoint = AuthRepo.AuthEndpoints.ApiUsers
-            parameters.method = Methods.PUT
-            getLoginResponse(parameters)
         }
     }
 
     fun loginUser(user: JSONObject) {
 
         viewModelScope.launch {
-            val parameters = ApiRequestParameters(scope = this)
-            parameters.scope = viewModelScope
-            parameters.data = user
-            parameters.endpoint = AuthRepo.AuthEndpoints.ApiUsers
-            parameters.method =Methods.POST
-            getLoginResponse(parameters)
+            try {
+                _isValidToken.value = NetworkResult.Loading()
+                val params = APIsCalls.AuthApiRequestParameters()
+                params.data = user
+                params.method = Methods.POST
+                params.endpoint = ValidEndpoints.AuthEndpoints.ApiUsers
+                apiCalls.authApiCall(parameters = params , listener = object  : RefCustomListener{
+                    override fun onApiJSONResponse(response: JSONObject) {
+
+                        if (response.has("code")) {
+                            _responseCode.postValue(NetworkResult.Success(response.get("code") as Int))
+                        }
+                        if (response.get("code")==10200) {
+                            _isValidToken.postValue(NetworkResult.Success(true))
+                        }
+
+                        if (response.has("localError")) {
+                            _responseCode.postValue(
+                                NetworkResult.Error(
+                                    data = 504,
+                                    message = response.get("message").toString()
+                                )
+                            )
+                        }
+                    }
+
+                    override fun onTokenExpiredResponse(request: Request?) {
+                        _isValidToken.postValue(NetworkResult.Success(false))
+                    }
+
+                })
+
+            }
+            catch (e:Exception){
+                _isValidToken.postValue(NetworkResult.Error(data = false))
+
+            }
         }
     }
 
-    fun loginGoogleUser(userToken: String) {
+    fun refLoginGoogleUser(userToken: String){
 
+        _isValidToken.value = NetworkResult.Loading()
         viewModelScope.launch {
-            val parameters = ApiRequestParameters(scope = this)
             val data = JSONObject("{}")
             data.put("googleToken", userToken)
-            parameters.scope = viewModelScope
-            parameters.data = data
-            parameters.endpoint = AuthRepo.AuthEndpoints.ApiUsersGoogleToken
-            parameters.method =Methods.POST
-            getLoginResponse(parameters)
+            try {
+
+                val params = APIsCalls.AuthApiRequestParameters()
+                params.data = data
+                params.method = Methods.POST
+                params.endpoint = ValidEndpoints.AuthEndpoints.ApiUsersGoogleToken
+                APIsCalls(app).authApiCall(parameters = params , listener = object  : RefCustomListener{
+                    override fun onApiJSONResponse(response: JSONObject) {
+                        _isValidToken.postValue(NetworkResult.Success(true))
+                        if (response.has("code")) {
+                            _responseCode.postValue(NetworkResult.Success(response.get("code") as Int))
+                        }
+                        if (response.has("localError")) {
+                            _responseCode.postValue(
+                                NetworkResult.Error(
+                                    data = 504,
+                                    message = response.get("message").toString()
+                                )
+                            )
+                        }
+                    }
+                    override fun onTokenExpiredResponse(request: Request?) {
+                        _isValidToken.postValue(NetworkResult.Success(false))
+                    }
+                })
+            }
+            catch (e:Exception){
+                _isValidToken.postValue(NetworkResult.Error(data = false))
+
+            }
         }
+
     }
 
 }
