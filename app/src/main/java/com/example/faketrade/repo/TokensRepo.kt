@@ -8,7 +8,9 @@ import com.example.faketrade.R
 
 
 enum class TokenType(val value: String) {
+
     ACCESS("x-access-token"), BEARER("x-refresh-token")
+
 }
 
 
@@ -22,8 +24,8 @@ class TokensRepo(context: Context) {
         with(sharedPref?.edit() ?: return) {
             putString(type.value, token)
             commit()
-        }
 
+        }
 
     }
 
@@ -32,4 +34,5 @@ class TokensRepo(context: Context) {
         return sharedPref?.getString(type.value, null)
 
     }
+
 }

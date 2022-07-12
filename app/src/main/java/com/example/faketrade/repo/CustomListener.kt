@@ -5,5 +5,5 @@ import org.json.JSONObject
 
 interface CustomListener {
     fun onApiJSONResponse(response: JSONObject)
-    fun onJsonExpiredResponse(request: Request)
+    fun onTokenExpiredResponse(request: Request)
 }
