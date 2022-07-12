@@ -73,7 +73,7 @@ class MainDashboardFragment : Fragment() {
         viewModel = ViewModelProvider(this).get(MainDashboardViewModel::class.java)
 
         button?.setOnClickListener {
-            viewModel.getSaldo()
+            viewModel.getUserSaldo()
         }
 
         viewModel.saldo.observe(this) { result ->

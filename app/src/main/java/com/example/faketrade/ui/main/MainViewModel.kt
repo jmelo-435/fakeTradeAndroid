@@ -3,8 +3,11 @@ package com.example.faketrade.ui.main
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.*
 import com.example.faketrade.repo.*
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -17,24 +20,42 @@ import kotlin.coroutines.coroutineContext
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
+
+
     val app = application
-    private val authRepo = Repo()
-    private var tokenRepo = TokensRepo(app)
+    private val authRepo = AuthRepo()
+    private val tokenRepo = TokensRepo(app)
+    private val googleLoginRepo = GoogleLoginRepo(app, listener = object :GoogleSigninListener{
+        override fun onGooglePositiveResponse(token: String) {
+            loginGoogleUser(token)
+        }
+
+        override fun onGoogleErrorResponse(e: ApiException) {
+            _googleError.postValue(NetworkResult.Success(e.message!!))
+        }
+
+    })
+
+
+    private var _googleError: MutableLiveData<NetworkResult<String>> = MutableLiveData()
+    var googleError: LiveData<NetworkResult<String>> = _googleError
 
     private var _responseCode: MutableLiveData<NetworkResult<Int>> = MutableLiveData()
     var responseCode: LiveData<NetworkResult<Int>> = _responseCode
 
-    private var _bearerToken: MutableLiveData<NetworkResult<String>> = MutableLiveData()
-    var bearerToken: LiveData<NetworkResult<String>> = _bearerToken
-
-    private var _accessToken: MutableLiveData<NetworkResult<String>> = MutableLiveData()
-    var accessToken: LiveData<NetworkResult<String>> = _accessToken
-
-    private var _authTokens: MutableLiveData<Map<TokenType, String>> = MutableLiveData()
-    var authTokens: LiveData<Map<TokenType, String>> = _authTokens
-
     private var _isValidToken: MutableLiveData<NetworkResult<Boolean>> = MutableLiveData()
     var isValidToken: LiveData<NetworkResult<Boolean>> = _isValidToken
+
+
+
+
+    fun handleSingnInResult(data :Intent?){
+
+        googleLoginRepo.handleSingnInResult(data)
+
+    }
+
+
 
     fun checkIfTokenIsValid() {
         _isValidToken.value = NetworkResult.Loading()
@@ -44,11 +65,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         try {
             viewModelScope.launch {
                 authRepo.buildRequest(
-                    url = Endpoints.AuthEndpoints.ApiUserRefreshToken.value,
-                    headersParams = currentToken,
+                    endpoint = AuthRepo.AuthEndpoints.ApiUserRefreshToken,
+                    headersMap = currentToken,
                     listener = object : CustomListener {
                         override fun onApiJSONResponse(response: JSONObject) {
-                            _isValidToken.postValue(NetworkResult.Success(true))
+
                             if (response.has("accessData") && response.has("bearerData")) {
 
 
@@ -56,12 +77,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 val bearer = response.get("bearerData").toString()
                                 tokenRepo.saveToken(access, TokenType.ACCESS)
                                 tokenRepo.saveToken(bearer, TokenType.BEARER)
+                                _isValidToken.postValue(NetworkResult.Success(true))
                             }
                         }
 
-                        override fun onJsonExpiredResponse(request: Request) {
+                        override fun onTokenExpiredResponse(request: Request) {
 
                             _isValidToken.postValue(NetworkResult.Success(false))
+
                         }
 
 
@@ -71,6 +94,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             }
         } catch (e: Exception) {
+
             _isValidToken.value = NetworkResult.Error(data = false, message = e.message)
 
         }
@@ -78,13 +102,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     }
 
-    private suspend fun getLoginResponse(parameters: ApiRequestParameters) {
+    private fun getLoginResponse(parameters: ApiRequestParameters) {
         _isValidToken.value = NetworkResult.Loading()
 
         parameters.scope.launch {
             try {
-                Repo().buildRequest(
-                    method = parameters.method.value,
+                authRepo.buildRequest(
+                    method = parameters.method,
                     listener = object : CustomListener {
                         override fun onApiJSONResponse(response: JSONObject) {
                             if (response.has("code")) {
@@ -97,12 +121,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 val access = response.get("accessData").toString()
                                 val bearer = response.get("bearerData").toString()
 
-
-                                val tokens = mapOf<TokenType, String>(
-                                    TokenType.ACCESS to access,
-                                    TokenType.BEARER to bearer
-                                )
-                                _authTokens.postValue(tokens)
+                                tokenRepo.saveToken(access, TokenType.ACCESS)
+                                tokenRepo.saveToken(bearer, TokenType.BEARER)
                                 _isValidToken.postValue(NetworkResult.Success(true))
                             }
                             if (response.has("localError")) {
@@ -116,13 +136,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
                         }
 
-                        override fun onJsonExpiredResponse(request: Request) {
+                        override fun onTokenExpiredResponse(request: Request) {
                             _isValidToken.postValue(NetworkResult.Success(false))
                         }
-
                     },
-                    url = parameters.endpoint,
-                    headersParams = parameters.headersMap,
+                    endpoint = parameters.endpoint,
+                    headersMap = parameters.headersMap,
                     data = parameters.data
                 )
             } catch (e: Exception) {
@@ -138,8 +157,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val parameters = ApiRequestParameters(scope = this)
             parameters.scope = viewModelScope
             parameters.data = user
-            parameters.endpoint = Endpoints.AuthEndpoints.ApiUsers.value
-            parameters.method = com.example.faketrade.repo.Methods.PUT
+            parameters.endpoint = AuthRepo.AuthEndpoints.ApiUsers
+            parameters.method = Methods.PUT
             getLoginResponse(parameters)
         }
     }
@@ -150,8 +169,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val parameters = ApiRequestParameters(scope = this)
             parameters.scope = viewModelScope
             parameters.data = user
-            parameters.endpoint = Endpoints.AuthEndpoints.ApiUsers.value
-            parameters.method = com.example.faketrade.repo.Methods.POST
+            parameters.endpoint = AuthRepo.AuthEndpoints.ApiUsers
+            parameters.method =Methods.POST
             getLoginResponse(parameters)
         }
     }
@@ -164,29 +183,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             data.put("googleToken", userToken)
             parameters.scope = viewModelScope
             parameters.data = data
-            parameters.endpoint = Endpoints.AuthEndpoints.ApiUsersGoogleToken.value
-            parameters.method = com.example.faketrade.repo.Methods.POST
+            parameters.endpoint = AuthRepo.AuthEndpoints.ApiUsersGoogleToken
+            parameters.method =Methods.POST
             getLoginResponse(parameters)
         }
     }
-
-
-    fun isAuthorizedCheck(context: Context, times: Int): Flow<Boolean> {
-
-
-        return flow {
-
-            repeat(times) {
-                var test = !TokensRepo(context).retreaveToken(TokenType.ACCESS).isNullOrEmpty() &&
-                        !TokensRepo(context).retreaveToken(TokenType.BEARER).isNullOrEmpty()
-                emit(test)
-                if (test) {
-                    coroutineContext.job.cancel()
-                }
-                delay(500)
-            }
-        }
-    }
-
 
 }

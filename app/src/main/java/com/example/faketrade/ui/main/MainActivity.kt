@@ -20,66 +20,38 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-
-
         viewModel = ViewModelProvider(this).get(MainViewModel::class.java)
-
         viewModel.checkIfTokenIsValid()
+        fun initializeUI() {
+            setContentView(R.layout.main_activity)
+            supportFragmentManager.commit {
+                supportFragmentManager.beginTransaction()
+                    .replace(R.id.container, MainFragment.newInstance())
+                    .commitNow()
+            }
+        }
         viewModel.isValidToken.observe(this) { result ->
             when (result) {
-
                 is NetworkResult.Success -> {
                     result.data?.let {
                         if (it) {
-
-
-
                             if (savedInstanceState == null) {
-
                                 val intent =
                                     Intent(this@MainActivity, MainDashboardActivity::class.java)
                                 startActivity(intent)
-
-
                             }
-                            } else {
-                            setContentView(R.layout.main_activity)
-                            supportFragmentManager.commit {
-                                supportFragmentManager.beginTransaction()
-                                    .replace(R.id.container, MainFragment.newInstance())
-                                    .commitNow()
-
-                            }
-
-                            }
-
-
+                        } else {
+                            initializeUI()
                         }
-                    }
-
-
-
-                    is NetworkResult.Loading -> {
-
-                    }
-                    is NetworkResult.Error ->{
-                        setContentView(R.layout.main_activity)
-
-                        supportFragmentManager.commit {
-                            supportFragmentManager.beginTransaction()
-                                .replace(R.id.container, MainFragment.newInstance())
-                                .commitNow()
-
-                        }
-
                     }
 
                 }
+                is NetworkResult.Loading -> {
+                }
+                is NetworkResult.Error -> {
+                    initializeUI()
+                }
             }
-
-
-
         }
-
     }
+}
