@@ -16,7 +16,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.example.faketrade.ui.dashboard.MainDashboardActivity
 import com.example.faketrade.R
-import com.example.faketrade.Utils
+import com.example.faketrade.databinding.MainFragmentBinding
 import com.example.faketrade.repo.*
 import com.google.android.gms.common.SignInButton
 import kotlinx.coroutines.flow.collectLatest
@@ -31,6 +31,7 @@ class MainFragment : Fragment() {
     }
 
     private lateinit var viewModel: MainViewModel
+    private lateinit var binding: MainFragmentBinding
 
     private var resultLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -43,8 +44,8 @@ class MainFragment : Fragment() {
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-
-        return inflater.inflate(R.layout.main_fragment, container, false)
+        binding = MainFragmentBinding.inflate(inflater, container, false)
+        return binding.root
 
     }
 
@@ -54,14 +55,40 @@ class MainFragment : Fragment() {
 
         viewModel = ViewModelProvider(this).get(MainViewModel::class.java)
 
-        val buttonLogin: Button? = view?.findViewById(R.id.login)
-        val nome: EditText? = view?.findViewById(R.id.editTextTextPersonName)
-        val senha: EditText? = view?.findViewById(R.id.editTextTextPassword)
-        val email: EditText? = view?.findViewById(R.id.editTextTextEmailAddress)
-        val textView: TextView? = view?.findViewById(R.id.textView2)
-        val googleButton: SignInButton? = view?.findViewById(R.id.sign_in_button)
-        var user = JSONObject("{}")
+        val buttonLogin: Button? = binding.login
+        val senha: EditText? = binding.editTextTextPassword
+        val email: EditText? = binding.editTextTextEmailAddress
+        val textView: TextView? = binding.textView2
+        val googleButton: SignInButton? = binding.signInButton
+        val passWarn = binding.passWarn
+        val emailWarn = binding.emailWarn
+
         val googleLoginRepo = GoogleLoginRepo(this.requireContext())
+
+        googleButton?.setOnClickListener {
+            resultLauncher.launch(googleLoginRepo.signInIntent)
+        }
+
+        buttonLogin?.setOnClickListener(View.OnClickListener {
+            viewModel.loginUser(email = email?.text.toString(), password = senha?.text.toString())
+
+        })
+
+        viewModel.checkedFields.observe(this){
+            if(!it["email"]!!){
+                emailWarn.visibility = View.VISIBLE
+            }else{
+                emailWarn.visibility = View.GONE
+
+            }
+            if(!it["password"]!!){
+                passWarn.visibility = View.VISIBLE
+
+            }else{
+                passWarn.visibility = View.GONE
+
+            }
+        }
 
         viewModel.googleError.observe(this){ result ->
 
@@ -95,7 +122,6 @@ class MainFragment : Fragment() {
                 is NetworkResult.Success -> {
                     result.data?.let {
                         if (it) {
-
                             val intent =
                                 Intent(this.requireContext(), MainDashboardActivity::class.java)
                             startActivity(intent)
@@ -114,7 +140,7 @@ class MainFragment : Fragment() {
                     //TODO: handle conection loading
                 }
                 is NetworkResult.Error -> {
-                    //TODO:handle local connection error
+                    Toast.makeText(this.requireContext(), result.message.toString(), Toast.LENGTH_LONG).show()
 
                 }
 
@@ -140,37 +166,6 @@ class MainFragment : Fragment() {
             }
         }
 
-
-        googleButton?.setOnClickListener {
-
-            resultLauncher.launch(googleLoginRepo.signInIntent)
-
-        }
-
-
-        fun isEmpty(text: String?): Boolean {
-
-            return Utils().isEmptyOrNull(text)
-
-        }
-
-
-        buttonLogin?.setOnClickListener(View.OnClickListener {
-            //TODO: Implementar a administração de entrada de dados
-            if (isEmpty(email?.text.toString()) || isEmpty(nome?.text.toString()) || isEmpty(senha?.text.toString())) {
-
-                Toast.makeText(view?.context, "Preencha os campos", Toast.LENGTH_LONG).show()
-            } else {
-                user.put("email", email?.text)
-                user.put("userName", nome?.text)
-                user.put("password", senha?.text)
-
-                viewModel.loginUser(user)
-
-
-            }
-
-        })
 
 
         viewModel.responseCode.observe(viewLifecycleOwner) { result ->

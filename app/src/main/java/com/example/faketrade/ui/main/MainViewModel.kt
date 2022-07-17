@@ -5,7 +5,9 @@ import android.app.Application
 import android.content.Intent
 import androidx.lifecycle.*
 import com.example.faketrade.domain.APIsCalls
+import com.example.faketrade.domain.UserCredentials
 import com.example.faketrade.repo.*
+import com.google.android.gms.auth.api.identity.SignInPassword
 import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.launch
 import okhttp3.Request
@@ -40,7 +42,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var _isValidToken: MutableLiveData<NetworkResult<Boolean>> = MutableLiveData()
     var isValidToken: LiveData<NetworkResult<Boolean>> = _isValidToken
 
-
+    private var _checkedFields: MutableLiveData<Map<String,Boolean>> = MutableLiveData()
+    var checkedFields: LiveData<Map<String,Boolean>> = _checkedFields
 
 
     fun handleSingnInResult(data :Intent?){
@@ -73,45 +76,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loginUser(user: JSONObject) {
+    fun loginUser(email:String,password: String) {
+        val checkedFields = UserCredentials(email, password).checkLoginCredentials()
+        _checkedFields.postValue(checkedFields)
+        if (!checkedFields.containsValue(false)){
+            viewModelScope.launch {
 
-        viewModelScope.launch {
-            try {
-                _isValidToken.value = NetworkResult.Loading()
-                val params = APIsCalls.AuthApiRequestParameters()
-                params.data = user
-                params.method = Methods.POST
-                params.endpoint = ValidEndpoints.AuthEndpoints.ApiUsers
-                apiCalls.authApiCall(parameters = params , listener = object  : RefCustomListener{
-                    override fun onApiJSONResponse(response: JSONObject) {
+                val user = JSONObject("{}")
+                user.put("email", email)
+                user.put("password", password)
+                try {
+                    _isValidToken.value = NetworkResult.Loading()
+                    val params = APIsCalls.AuthApiRequestParameters()
+                    params.data = user
+                    params.method = Methods.POST
+                    params.endpoint = ValidEndpoints.AuthEndpoints.ApiUsers
+                    apiCalls.authApiCall(parameters = params , listener = object  : RefCustomListener{
+                        override fun onApiJSONResponse(response: JSONObject) {
 
-                        if (response.has("code")) {
-                            _responseCode.postValue(NetworkResult.Success(response.get("code") as Int))
-                        }
-                        if (response.get("code")==10200) {
-                            _isValidToken.postValue(NetworkResult.Success(true))
-                        }
+                            if (response.has("code")) {
+                                _responseCode.postValue(NetworkResult.Success(response.get("code") as Int))
+                            }
+                            if (response.get("code")==10200) {
+                                _isValidToken.postValue(NetworkResult.Success(true))
+                            }
 
-                        if (response.has("localError")) {
-                            _responseCode.postValue(
-                                NetworkResult.Error(
-                                    data = 504,
-                                    message = response.get("message").toString()
+                            if (response.has("localError")) {
+                                _responseCode.postValue(
+                                    NetworkResult.Error(
+                                        data = 504,
+                                        message = response.get("message").toString()
+                                    )
                                 )
-                            )
+                            }
                         }
-                    }
 
-                    override fun onTokenExpiredResponse(request: Request?) {
-                        _isValidToken.postValue(NetworkResult.Success(false))
-                    }
+                        override fun onTokenExpiredResponse(request: Request?) {
+                            _isValidToken.postValue(NetworkResult.Success(false))
+                        }
 
-                })
+                    })
 
-            }
-            catch (e:Exception){
-                _isValidToken.postValue(NetworkResult.Error(data = false))
+                }
+                catch (e:Exception){
+                    _isValidToken.postValue(NetworkResult.Error(data = false))
 
+                }
             }
         }
     }
@@ -130,9 +140,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 params.endpoint = ValidEndpoints.AuthEndpoints.ApiUsersGoogleToken
                 APIsCalls(app).authApiCall(parameters = params , listener = object  : RefCustomListener{
                     override fun onApiJSONResponse(response: JSONObject) {
-                        _isValidToken.postValue(NetworkResult.Success(true))
+
                         if (response.has("code")) {
-                            _responseCode.postValue(NetworkResult.Success(response.get("code") as Int))
+                            if(response.get("code")==20200){
+                                _isValidToken.postValue(NetworkResult.Success(true))
+                            }
+                            else{
+                                _responseCode.postValue(NetworkResult.Success(response.get("code") as Int))
+                            }
+
+                        }
+                        else{
+                            _isValidToken.postValue(NetworkResult.Error(message = response.get("msg") as String))
                         }
                         if (response.has("localError")) {
                             _responseCode.postValue(
