@@ -79,7 +79,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun loginUser(email:String,password: String) {
         val checkedFields = UserCredentials(email, password).checkLoginCredentials()
         _checkedFields.postValue(checkedFields)
-        if (!checkedFields.containsValue(false)){
+        if (checkedFields["email"]==true){
             viewModelScope.launch {
 
                 val user = JSONObject("{}")
@@ -171,6 +171,60 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _isValidToken.postValue(NetworkResult.Error(data = false))
 
             }
+        }
+
+    }
+
+    fun createUser(email: String, userName :String,confPass:String, password: String){
+        val checkedFields = UserCredentials(email, password,confPass,userName).checkCreateAccountCredentials()
+        _checkedFields.postValue(checkedFields)
+
+        if (!checkedFields.containsValue(false)){
+            viewModelScope.launch {
+                val user = JSONObject("{}")
+                user.put("email", email)
+                user.put("password", password)
+                user.put("userName", userName)
+                try {
+                    _isValidToken.value = NetworkResult.Loading()
+                    val params = APIsCalls.AuthApiRequestParameters()
+                    params.data = user
+                    params.method = Methods.PUT
+                    params.endpoint = ValidEndpoints.AuthEndpoints.ApiUsers
+                    apiCalls.authApiCall(parameters = params , listener = object  : RefCustomListener{
+                        override fun onApiJSONResponse(response: JSONObject) {
+
+                            if (response.has("code")) {
+                                _responseCode.postValue(NetworkResult.Success(response.get("code") as Int))
+                            }
+                            if (response.get("code")==10200) {
+                                _isValidToken.postValue(NetworkResult.Success(true))
+                            }
+
+                            if (response.has("localError")) {
+                                _responseCode.postValue(
+                                    NetworkResult.Error(
+                                        data = 504,
+                                        message = response.get("message").toString()
+                                    )
+                                )
+                            }
+                        }
+
+                        override fun onTokenExpiredResponse(request: Request?) {
+                            _isValidToken.postValue(NetworkResult.Success(false))
+                        }
+
+                    })
+
+                }
+                catch (e:Exception){
+                    _isValidToken.postValue(NetworkResult.Error(data = false))
+
+                }
+
+            }
+
         }
 
     }
