@@ -1,5 +1,6 @@
 package com.example.faketrade.ui.main
 
+
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
@@ -8,20 +9,17 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.example.faketrade.ui.dashboard.MainDashboardActivity
 import com.example.faketrade.R
 import com.example.faketrade.databinding.MainFragmentBinding
 import com.example.faketrade.repo.*
+import com.example.faketrade.ui.dashboard.MainDashboardActivity
 import com.google.android.gms.common.SignInButton
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 
 
 class MainFragment : Fragment() {
@@ -58,10 +56,10 @@ class MainFragment : Fragment() {
         val buttonLogin: Button? = binding.login
         val senha: EditText? = binding.editTextTextPassword
         val email: EditText? = binding.editTextTextEmailAddress
-        val textView: TextView? = binding.textView2
         val googleButton: SignInButton? = binding.signInButton
         val passWarn = binding.passWarn
         val emailWarn = binding.emailWarn
+        val textoCriarConta = binding.textoCriarConta
 
         val googleLoginRepo = GoogleLoginRepo(this.requireContext())
 
@@ -73,21 +71,23 @@ class MainFragment : Fragment() {
             viewModel.loginUser(email = email?.text.toString(), password = senha?.text.toString())
 
         })
+        textoCriarConta.setOnClickListener {
+            val nextFrag = CreateAccountFragment()
+            requireActivity().supportFragmentManager.beginTransaction()
+                .replace(com.example.faketrade.R.id.container, nextFrag, "findThisFragment")
+                .addToBackStack(null)
+                .commit()
+
+        }
 
         viewModel.checkedFields.observe(this){
             if(!it["email"]!!){
                 emailWarn.visibility = View.VISIBLE
             }else{
-                emailWarn.visibility = View.GONE
+                emailWarn.visibility = View.INVISIBLE
 
             }
-            if(!it["password"]!!){
-                passWarn.visibility = View.VISIBLE
 
-            }else{
-                passWarn.visibility = View.GONE
-
-            }
         }
 
         viewModel.googleError.observe(this){ result ->
