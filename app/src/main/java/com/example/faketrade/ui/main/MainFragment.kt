@@ -57,9 +57,9 @@ class MainFragment : Fragment() {
         val senha: EditText? = binding.editTextTextPassword
         val email: EditText? = binding.editTextTextEmailAddress
         val googleButton: SignInButton? = binding.signInButton
-        val passWarn = binding.passWarn
         val emailWarn = binding.emailWarn
         val textoCriarConta = binding.textoCriarConta
+        val textoEsqueciSenha = binding.textoEsqueciSenha
 
         val googleLoginRepo = GoogleLoginRepo(this.requireContext())
 
@@ -78,6 +78,14 @@ class MainFragment : Fragment() {
                 .addToBackStack(null)
                 .commit()
 
+        }
+
+        textoEsqueciSenha.setOnClickListener {
+            val nextFrag = ResetPasswordFragment()
+            requireActivity().supportFragmentManager.beginTransaction()
+                .replace(com.example.faketrade.R.id.container, nextFrag, "findThisFragment")
+                .addToBackStack(null)
+                .commit()
         }
 
         viewModel.checkedFields.observe(this){
