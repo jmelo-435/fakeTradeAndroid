@@ -45,6 +45,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var _checkedFields: MutableLiveData<Map<String,Boolean>> = MutableLiveData()
     var checkedFields: LiveData<Map<String,Boolean>> = _checkedFields
 
+    private var _isPassReset: MutableLiveData<NetworkResult<Boolean>> = MutableLiveData()
+    var isPassReset: LiveData<NetworkResult<Boolean>> = _isPassReset
+
 
     fun handleSingnInResult(data :Intent?){
 
@@ -225,6 +228,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             }
 
+        }
+
+    }
+
+    fun sendResetPasswordEmail(email:String){
+        val user = JSONObject("{}")
+        user.put("email", email)
+        val isEmailValid  =UserCredentials(email = email).checkEmail()
+        _checkedFields.value = mapOf<String,Boolean>("email" to isEmailValid )
+        if (isEmailValid){
+            viewModelScope.launch(){
+                try{
+                    val params = APIsCalls.AuthApiRequestParameters()
+                    params.data = user
+                    params.method = Methods.POST
+                    params.endpoint = ValidEndpoints.AuthEndpoints.ApiUserPasswordReset
+                    APIsCalls(app).authApiCall(parameters = params, listener = object :RefCustomListener{
+                        override fun onApiJSONResponse(response: JSONObject) {
+                            if(response.has("sucess")){
+                                _isPassReset.postValue(NetworkResult.Success(response.get("sucess") as Boolean))
+
+                            }
+                        }
+
+                        override fun onTokenExpiredResponse(request: Request?) {
+                            TODO("Not yet implemented")
+                        }
+
+                    })
+                }
+                catch (e:Exception){
+                    _isPassReset.postValue(NetworkResult.Error(data = false, message = e.message))
+                }
+
+            }
         }
 
     }

@@ -5,7 +5,7 @@ import java.util.regex.Pattern
 
 class UserCredentials(
     private val email: String,
-    private val password: String,
+    private val password: String?=null,
     private val confirmPassword: String? = null,
     private val userName: String? = null
 ) {
@@ -30,19 +30,22 @@ class UserCredentials(
     private fun isUserNameValid(userName: String): Boolean {
         return userName.length >= 2
     }
+    fun checkEmail():Boolean{
+        return isEmailValid(email)
+    }
 
     fun checkLoginCredentials(): Map<String, Boolean> {
         return mapOf<String, Boolean>(
             "email" to isEmailValid(email),
-            "password" to isPasswordValid(password)
+            "password" to isPasswordValid(password!!)
         )
     }
 
     fun checkCreateAccountCredentials(): Map<String, Boolean> {
         return mapOf(
             "email" to isEmailValid(email),
-            "password" to isPasswordValid(password),
-            "confirmPassword" to checkPasswordMatches(password, confirmPassword!!),
+            "password" to isPasswordValid(password!!),
+            "confirmPassword" to checkPasswordMatches(password!!, confirmPassword!!),
             "userName" to isUserNameValid(userName!!)
         )
 
